@@ -1,0 +1,44 @@
+{% extends "default/module.html.jinja2" %}
+
+
+{% defaultmacro function(fn) -%}
+    {% if fn.name == "__init__" %}
+        <span class="name">{{ ".".join(fn.qualname.split(".")[:-1]) }}</span>
+        {{- fn.signature_without_self | format_signature(colon=False) | linkify }}
+    {% else %}
+        {{ decorators(fn) }}
+        <span class="name">{{ fn.name }}</span>
+        {{- fn.signature_without_self | format_signature(colon=True) | linkify }}
+    {% endif %}
+{% enddefaultmacro %}
+
+{% defaultmacro class(cls) -%}
+    {{ decorators(cls) }}
+    {% set inline_constructor = cls.flattened_own_members | selectattr("name", "equalto", "__init__") | first %}
+    {% if inline_constructor is defined %}
+        {{ function(inline_constructor) }}
+    {% else %}
+        <span class="name">{{ cls.qualname }}()</span>
+    {% endif %}
+{% enddefaultmacro %}
+{% defaultmacro is_public(doc) %}
+    {#
+    Override the default is_public macro to not include the constructor in 
+    generated documentation since we document it in the class docstring.
+    #}
+    {% if doc.type == "module" and doc.fullname not in all_modules %}
+        {# Don't document modules that were manually excluded from the documentation #}
+        {# https://github.com/mitmproxy/pdoc/issues/334 #}
+    {% elif not doc.name.startswith("_") %}
+        {# members not starting with an underscore are considered public by default #}
+        true
+    {% elif (doc.qualname or doc.name) is in(module.obj.__all__ or []) %}
+        {# members starting with an underscore are still public if mentioned in __all__ #}
+        {% if doc.name != "__doc__" %}
+            {# ... but sometimes we have __doc__ in __all__, which we want to exclude for pdoc's purposes. #}
+            {# https://github.com/mitmproxy/pdoc/issues/235 #}
+            true
+        {% endif %}
+    {% endif %}
+{% enddefaultmacro %}
+
